@@ -105,9 +105,11 @@ def submit_transcription(meeting_id: int, audio_path: str) -> Dict[str, Any]:
             return {"error": error_msg, "status": "failed"}
             
     except Exception as e:
+        import traceback
+        stack_trace = traceback.format_exc()
         error_msg = f"Exception during transcription submission: {str(e)}"
-        logger.error(error_msg)
-        return {"error": error_msg, "status": "failed"}
+        logger.error(f"{error_msg}\n{stack_trace}")
+        return {"error": error_msg, "stack_trace": stack_trace, "status": "failed"}
 
 
 @app.task
