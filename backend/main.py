@@ -3,7 +3,9 @@ from datetime import datetime
 import os
 
 from celery.result import AsyncResult
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from task import dummy_task, submit_transcription, poll_transcription_status, process_completed_transcript
@@ -13,10 +15,14 @@ from models import Meeting, MeetingCreate, MeetingUpdate, TranscriptionStatus, T
 
 app = FastAPI()
 
+# Templates und statische Dateien einrichten
+templates = Jinja2Templates(directory="templates")
+
 
 @app.get("/")
-def read_root():
-    return {"Hello": "World"}
+async def read_root(request: Request):
+    meetings = db.get_all_meetings()
+    return templates.TemplateResponse("index.html", {"request": request, "meetings": meetings})
 
 
 class TaskOut(BaseModel):
@@ -46,38 +52,92 @@ def get_meetings():
     return db.get_all_meetings()
 
 
-@app.get("/meetings/{meeting_id}", response_model=Meeting)
-def get_meeting(meeting_id: int):
+@app.get("/meetings/{meeting_id}", response_model=None)
+async def get_meeting_detail(request: Request, meeting_id: int):
     meeting = db.get_meeting(meeting_id)
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting nicht gefunden")
-    return meeting
+    return templates.TemplateResponse("meeting_detail.html", {"request": request, "meeting": meeting})
 
 
-@app.post("/meetings", response_model=Meeting)
-def create_meeting(meeting: MeetingCreate):
-    return db.create_meeting(meeting)
+from fastapi import Form
+
+@app.post("/meetings", response_model=None)
+async def create_meeting(
+    request: Request,
+    title: str = Form(...),
+    date: str = Form(...),
+    link: str = Form(None)
+):
+    # Datum aus dem Formular in datetime umwandeln
+    meeting_date = datetime.fromisoformat(date.replace('T', ' '))
+    
+    # Meeting-Objekt erstellen
+    meeting_create = MeetingCreate(
+        title=title,
+        date=meeting_date,
+        link=link
+    )
+    
+    # Meeting in der Datenbank erstellen
+    meeting = db.create_meeting(meeting_create)
+    
+    # Wenn es ein HTMX-Request ist, nur die Meeting-Karte zurückgeben
+    if request.headers.get("HX-Request"):
+        return templates.TemplateResponse(
+            "index.html", 
+            {"request": request, "meetings": [meeting]},
+            headers={"HX-Trigger": "meetingCreated"}
+        )
+    
+    # Ansonsten zur Hauptseite umleiten
+    return templates.TemplateResponse("index.html", {"request": request, "meetings": db.get_all_meetings()})
 
 
-@app.put("/meetings/{meeting_id}", response_model=Meeting)
-def update_meeting(meeting_id: int, meeting_update: MeetingUpdate):
+@app.put("/meetings/{meeting_id}", response_model=None)
+async def update_meeting(
+    request: Request,
+    meeting_id: int,
+    title: str = Form(...),
+    date: str = Form(...),
+    link: str = Form(None)
+):
+    # Datum aus dem Formular in datetime umwandeln
+    meeting_date = datetime.fromisoformat(date.replace('T', ' '))
+    
+    # Meeting-Update-Objekt erstellen
+    meeting_update = MeetingUpdate(
+        title=title,
+        date=meeting_date,
+        link=link
+    )
+    
+    # Meeting in der Datenbank aktualisieren
     updated_meeting = db.update_meeting(meeting_id, meeting_update)
     if not updated_meeting:
         raise HTTPException(status_code=404, detail="Meeting nicht gefunden")
-    return updated_meeting
+    
+    # Zur Meeting-Detailseite zurückkehren
+    return templates.TemplateResponse("meeting_detail.html", {"request": request, "meeting": updated_meeting})
 
 
 @app.delete("/meetings/{meeting_id}")
-def delete_meeting(meeting_id: int):
+async def delete_meeting(request: Request, meeting_id: int):
     success = db.delete_meeting(meeting_id)
     if not success:
         raise HTTPException(status_code=404, detail="Meeting nicht gefunden")
-    return {"message": "Meeting erfolgreich gelöscht"}
+    
+    if request.headers.get("HX-Request"):
+        # Wenn es ein HTMX-Request ist, leere Antwort zurückgeben (Element wird entfernt)
+        return ""
+    
+    # Ansonsten zur Hauptseite umleiten
+    return templates.TemplateResponse("index.html", {"request": request, "meetings": db.get_all_meetings()})
 
 
 # Transcription Endpoints
 @app.post("/meetings/{meeting_id}/transcribe")
-def transcribe_meeting(meeting_id: int):
+async def transcribe_meeting(request: Request, meeting_id: int):
     # Hole das Meeting aus der Datenbank
     meeting = db.get_meeting(meeting_id)
     if not meeting:
@@ -98,16 +158,27 @@ def transcribe_meeting(meeting_id: int):
     # Erstelle einen Transkriptionsjob in der Datenbank
     job = db.create_transcription_job(meeting_id, r.task_id)
     
+    # Aktualisiere das Meeting-Objekt
+    meeting = db.get_meeting(meeting_id)
+    
+    if request.headers.get("HX-Request"):
+        # Wenn es ein HTMX-Request ist, zur Meeting-Detailseite zurückkehren
+        return templates.TemplateResponse("meeting_detail.html", {"request": request, "meeting": meeting})
+    
     return {"job_id": job.job_id, "status": job.status}
 
 
 @app.get("/queue")
-def get_queue_status():
-    return db.get_all_transcription_jobs()
+async def get_queue_status(request: Request):
+    jobs = db.get_all_transcription_jobs()
+    if request.headers.get("HX-Request"):
+        # Wenn es ein HTMX-Request ist, nur die Tabelle zurückgeben
+        return templates.TemplateResponse("job_row.html", {"request": request, "jobs": jobs})
+    return templates.TemplateResponse("queue.html", {"request": request, "jobs": jobs})
 
 
 @app.get("/queue/{job_id}")
-def get_job_status(job_id: str):
+async def get_job_status(request: Request, job_id: str):
     job = db.get_transcription_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job nicht gefunden")
@@ -139,13 +210,16 @@ def get_job_status(job_id: str):
     elif celery_status == "STARTED" and job.status == TranscriptionStatus.PENDING:
         job = db.update_transcription_job_status(job_id, TranscriptionStatus.PROCESSING)
     
+    if request.headers.get("HX-Request"):
+        # Wenn es ein HTMX-Request ist, nur die Zeile zurückgeben
+        return templates.TemplateResponse("job_row.html", {"request": request, "job": job})
     return job
 
 
-from fastapi import File, UploadFile
+from fastapi import File, UploadFile, Form
 
 @app.post("/meetings/{meeting_id}/upload")
-async def upload_audio_file(meeting_id: int, file: UploadFile = File(...)):
+async def upload_audio_file(request: Request, meeting_id: int, file: UploadFile = File(...)):
     # Prüfe, ob das Meeting existiert
     meeting = db.get_meeting(meeting_id)
     if not meeting:
@@ -174,6 +248,10 @@ async def upload_audio_file(meeting_id: int, file: UploadFile = File(...)):
         meeting_id, 
         MeetingUpdate(audio_file=relative_path)
     )
+    
+    if request.headers.get("HX-Request"):
+        # Wenn es ein HTMX-Request ist, zur Meeting-Detailseite zurückkehren
+        return templates.TemplateResponse("meeting_detail.html", {"request": request, "meeting": updated_meeting})
     
     return {"message": "Audio-Datei erfolgreich hochgeladen", "meeting": updated_meeting}
 

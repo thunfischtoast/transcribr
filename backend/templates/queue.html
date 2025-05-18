@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Transkriptionsqueue{% endblock %}
+
+{% block content %}
+<h1 class="title">Transkriptionsqueue</h1>
+
+<div class="box">
+    <h2 class="subtitle">Aktive Jobs</h2>
+    <table class="table is-fullwidth">
+        <thead>
+            <tr>
+                <th>Job ID</th>
+                <th>Meeting</th>
+                <th>Status</th>
+                <th>Erstellt</th>
+                <th>Aktualisiert</th>
+                <th>Aktionen</th>
+            </tr>
+        </thead>
+        <tbody id="jobs-table">
+            {% for job in jobs %}
+            <tr>
+                <td>{{ job.job_id }}</td>
+                <td><a href="/meetings/{{ job.meeting_id }}">Meeting #{{ job.meeting_id }}</a></td>
+                <td>
+                    <span class="tag 
+                        {% if job.status == 'pending' %}is-info
+                        {% elif job.status == 'processing' %}is-warning
+                        {% elif job.status == 'completed' %}is-success
+                        {% else %}is-danger{% endif %}">
+                        {{ job.status }}
+                    </span>
+                </td>
+                <td>{{ job.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                <td>{{ job.updated_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                <td>
+                    <button class="button is-small is-info"
+                            hx-get="/queue/{{ job.job_id }}"
+                            hx-target="closest tr"
+                            hx-swap="outerHTML">
+                        Aktualisieren
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="content">
+    <button class="button is-primary"
+            hx-get="/queue"
+            hx-target="#jobs-table"
+            hx-swap="innerHTML">
+        Alle Jobs aktualisieren
+    </button>
+</div>
+{% endblock %}

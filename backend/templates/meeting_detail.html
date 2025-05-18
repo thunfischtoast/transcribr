@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}{{ meeting.title }}{% endblock %}
+
+{% block content %}
+<div class="columns">
+    <div class="column">
+        <h1 class="title">{{ meeting.title }}</h1>
+        <span class="tag 
+            {% if meeting.status == 'pending' %}is-info
+            {% elif meeting.status == 'processing' %}is-warning
+            {% elif meeting.status == 'completed' %}is-success
+            {% else %}is-danger{% endif %}">
+            {{ meeting.status }}
+        </span>
+    </div>
+    <div class="column is-narrow">
+        <a href="/" class="button">Zurück zur Übersicht</a>
+    </div>
+</div>
+
+<div class="box">
+    <h2 class="subtitle">Meeting-Details</h2>
+    <div class="content">
+        <p><strong>Datum:</strong> {{ meeting.date.strftime('%d.%m.%Y %H:%M') }}</p>
+        {% if meeting.link %}
+        <p><strong>Link:</strong> <a href="{{ meeting.link }}" target="_blank">{{ meeting.link }}</a></p>
+        {% endif %}
+    </div>
+
+    <h3 class="subtitle">Meeting bearbeiten</h3>
+    <form hx-put="/meetings/{{ meeting.id }}" hx-target="body">
+        <div class="field">
+            <label class="label">Titel</label>
+            <div class="control">
+                <input class="input" type="text" name="title" value="{{ meeting.title }}" required>
+            </div>
+        </div>
+        <div class="field">
+            <label class="label">Datum</label>
+            <div class="control">
+                <input class="input" type="datetime-local" name="date" value="{{ meeting.date.strftime('%Y-%m-%dT%H:%M') }}" required>
+            </div>
+        </div>
+        <div class="field">
+            <label class="label">Link (optional)</label>
+            <div class="control">
+                <input class="input" type="url" name="link" value="{{ meeting.link or '' }}">
+            </div>
+        </div>
+        <div class="field">
+            <div class="control">
+                <button class="button is-primary" type="submit">Aktualisieren</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="box">
+    <h2 class="subtitle">Audio-Datei</h2>
+    {% if meeting.audio_file %}
+    <div class="content">
+        <p>Audio-Datei ist vorhanden.</p>
+        {% if meeting.status == 'pending' %}
+        <button class="button is-primary" 
+                hx-post="/meetings/{{ meeting.id }}/transcribe"
+                hx-target="body">
+            Transkription starten
+        </button>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="content">
+        <p>Keine Audio-Datei vorhanden. Bitte laden Sie eine Datei hoch.</p>
+    </div>
+    <form hx-post="/meetings/{{ meeting.id }}/upload" 
+          hx-encoding="multipart/form-data"
+          hx-target="body">
+        <div class="file has-name">
+            <label class="file-label">
+                <input class="file-input" type="file" name="file" accept="audio/*">
+                <span class="file-cta">
+                    <span class="file-icon">
+                        <i class="fas fa-upload"></i>
+                    </span>
+                    <span class="file-label">
+                        Audio-Datei auswählen
+                    </span>
+                </span>
+                <span class="file-name">
+                    Keine Datei ausgewählt
+                </span>
+            </label>
+        </div>
+        <div class="field mt-3">
+            <div class="control">
+                <button class="button is-primary" type="submit">Hochladen</button>
+            </div>
+        </div>
+    </form>
+    {% endif %}
+</div>
+
+<div class="box">
+    <h2 class="subtitle">Transkript</h2>
+    {% if meeting.transcript %}
+    <div class="content">
+        <div class="transcript-text">{{ meeting.transcript }}</div>
+    </div>
+    {% else %}
+    <div class="content">
+        <p>Noch kein Transkript vorhanden.</p>
+        {% if meeting.audio_file and meeting.status == 'pending' %}
+        <button class="button is-primary" 
+                hx-post="/meetings/{{ meeting.id }}/transcribe"
+                hx-target="body">
+            Transkription starten
+        </button>
+        {% elif meeting.status == 'processing' %}
+        <p>Transkription wird bearbeitet...</p>
+        <div class="progress is-small is-primary">
+            <div class="progress-bar" style="width: 50%"></div>
+        </div>
+        <button class="button is-info" 
+                hx-get="/meetings/{{ meeting.id }}"
+                hx-target="body">
+            Status aktualisieren
+        </button>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block head %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // File input name update
+        const fileInput = document.querySelector('.file-input');
+        if (fileInput) {
+            fileInput.onchange = () => {
+                if (fileInput.files.length > 0) {
+                    const fileName = document.querySelector('.file-name');
+                    fileName.textContent = fileInput.files[0].name;
+                }
+            };
+        }
+    });
+</script>
+{% endblock %}

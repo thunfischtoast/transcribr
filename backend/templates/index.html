@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Meetings{% endblock %}
+
+{% block content %}
+<h1 class="title">Meetings</h1>
+
+<div class="box">
+    <h2 class="subtitle">Neues Meeting erstellen</h2>
+    <form hx-post="/meetings" hx-target="#meeting-list" hx-swap="afterbegin">
+        <div class="field">
+            <label class="label">Titel</label>
+            <div class="control">
+                <input class="input" type="text" name="title" required>
+            </div>
+        </div>
+        <div class="field">
+            <label class="label">Datum</label>
+            <div class="control">
+                <input class="input" type="datetime-local" name="date" required>
+            </div>
+        </div>
+        <div class="field">
+            <label class="label">Link (optional)</label>
+            <div class="control">
+                <input class="input" type="url" name="link">
+            </div>
+        </div>
+        <div class="field">
+            <div class="control">
+                <button class="button is-primary" type="submit">Meeting erstellen</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<h2 class="subtitle">Alle Meetings</h2>
+<div id="meeting-list" class="columns is-multiline">
+    {% for meeting in meetings %}
+    <div class="column is-one-third">
+        <div class="card">
+            <header class="card-header">
+                <p class="card-header-title">{{ meeting.title }}</p>
+                <span class="card-header-icon">
+                    <span class="tag 
+                        {% if meeting.status == 'pending' %}is-info
+                        {% elif meeting.status == 'processing' %}is-warning
+                        {% elif meeting.status == 'completed' %}is-success
+                        {% else %}is-danger{% endif %}">
+                        {{ meeting.status }}
+                    </span>
+                </span>
+            </header>
+            <div class="card-content">
+                <div class="content">
+                    <p><strong>Datum:</strong> {{ meeting.date.strftime('%d.%m.%Y %H:%M') }}</p>
+                    {% if meeting.link %}
+                    <p><strong>Link:</strong> <a href="{{ meeting.link }}" target="_blank">{{ meeting.link }}</a></p>
+                    {% endif %}
+                    {% if meeting.audio_file %}
+                    <p><strong>Audio:</strong> Vorhanden</p>
+                    {% else %}
+                    <p><strong>Audio:</strong> Nicht vorhanden</p>
+                    {% endif %}
+                </div>
+            </div>
+            <footer class="card-footer">
+                <a href="/meetings/{{ meeting.id }}" class="card-footer-item">Details</a>
+                <a href="#" class="card-footer-item" 
+                   hx-delete="/meetings/{{ meeting.id }}"
+                   hx-confirm="Meeting wirklich löschen?"
+                   hx-target="closest .column"
+                   hx-swap="outerHTML">Löschen</a>
+            </footer>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
