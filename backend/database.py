@@ -7,7 +7,7 @@ from models import Meeting, MeetingCreate, MeetingUpdate, TranscriptionJob, Tran
 
 
 class Database:
-    def __init__(self, db_path: str = "meetings.db"):
+    def __init__(self, db_path: str = "data/meetings.db"):
         self.db_path = db_path
         self.connection = None
         self.initialize_db()
