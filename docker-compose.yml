@@ -11,7 +11,7 @@ services:
         environment:
             - REDIS_URL=redis://redis:6379/0
             - DATABASE_URL=sqlite:///./data/meetings.db
-            - TRANSCRIPTION_SERVICE_URL=http://transcription:9000/asr
+            - TRANSCRIPTION_SERVICE_URL=http://transcription:9000
             - UPLOAD_FOLDER=/app/data/uploads
         depends_on:
             - redis
@@ -29,7 +29,7 @@ services:
         environment:
             - REDIS_URL=redis://redis:6379/0
             - DATABASE_URL=sqlite:///./data/meetings.db
-            - TRANSCRIPTION_SERVICE_URL=http://transcription:9000/asr
+            - TRANSCRIPTION_SERVICE_URL=http://transcription:9000
             - UPLOAD_FOLDER=/app/data/uploads
         depends_on:
             - redis

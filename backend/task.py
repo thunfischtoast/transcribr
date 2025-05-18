@@ -84,11 +84,11 @@ def submit_transcription(meeting_id: int, audio_path: str) -> Dict[str, Any]:
             response = requests.post(
                 f"{whisper_service_url}/asr",
                 files=files,
-                data={"task": "transcribe", "language": "de"}
+                data={"task": "transcribe", "language": "de", "output": "txt"},
             )
         
         if response.status_code == 200:
-            result = response.json()
+            result = response.text
             job_id = result.get("id", "unknown")
             
             # Starte einen Task zum Abfragen des Status

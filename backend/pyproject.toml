@@ -7,4 +7,6 @@ requires-python = ">=3.12"
 dependencies = [
     "celery[redis]>=5.5.2",
     "fastapi[standard]>=0.115.12",
+    "python-multipart>=0.0.20",
+    "requests>=2.32.3",
 ]
