@@ -1,11 +1,12 @@
 from typing import Union, List
 from datetime import datetime
+import os
 
 from celery.result import AsyncResult
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 
-from task import dummy_task
+from task import dummy_task, submit_transcription, poll_transcription_status, process_completed_transcript
 from task import app as celery_app
 from database import db
 from models import Meeting, MeetingCreate, MeetingUpdate, TranscriptionStatus, TranscriptionJob
@@ -77,8 +78,7 @@ def delete_meeting(meeting_id: int):
 # Transcription Endpoints
 @app.post("/meetings/{meeting_id}/transcribe")
 def transcribe_meeting(meeting_id: int):
-    # Hier würden wir normalerweise die Audio-Datei an den Transcription-Service senden
-    # Für jetzt verwenden wir den dummy_task als Platzhalter
+    # Hole das Meeting aus der Datenbank
     meeting = db.get_meeting(meeting_id)
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting nicht gefunden")
@@ -86,11 +86,17 @@ def transcribe_meeting(meeting_id: int):
     if not meeting.audio_file:
         raise HTTPException(status_code=400, detail="Keine Audio-Datei für dieses Meeting vorhanden")
     
-    # Dummy-Task starten
-    r = dummy_task.delay()
+    # Starte den Transkriptionstask
+    r = submit_transcription.delay(meeting_id, meeting.audio_file)
     
-    # Transcription Job erstellen
+    # Erstelle einen Transkriptionsjob in der Datenbank
     job = db.create_transcription_job(meeting_id, r.task_id)
+    
+    # Aktualisiere den Meeting-Status auf "processing"
+    db.update_meeting(
+        meeting_id,
+        MeetingUpdate(status=TranscriptionStatus.PROCESSING)
+    )
     
     return {"job_id": job.job_id, "status": job.status}
 
@@ -112,9 +118,21 @@ def get_job_status(job_id: str):
     
     # Wenn der Celery-Status sich geändert hat, aktualisieren wir den Job-Status
     if celery_status == "SUCCESS" and job.status != TranscriptionStatus.COMPLETED:
+        # Ergebnis des Tasks abrufen
+        task_result = celery_result.result
+        
+        # Wenn das Ergebnis ein Transkript enthält, speichern wir es
+        if isinstance(task_result, dict) and task_result.get("status") == "completed":
+            # Prüfen, ob ein Transkript-Datei-Pfad vorhanden ist
+            transcript_file = task_result.get("transcript_file")
+            if transcript_file and os.path.exists(transcript_file):
+                with open(transcript_file, "r", encoding="utf-8") as f:
+                    transcript_text = f.read()
+                # Transkript in der Datenbank speichern
+                db.save_transcript(job.meeting_id, transcript_text)
+            
         job = db.update_transcription_job_status(job_id, TranscriptionStatus.COMPLETED)
-        # Hier würden wir normalerweise das Transkript speichern
-        db.save_transcript(job.meeting_id, "Dies ist ein Beispiel-Transkript.")
+        
     elif celery_status == "FAILURE" and job.status != TranscriptionStatus.FAILED:
         job = db.update_transcription_job_status(job_id, TranscriptionStatus.FAILED)
     elif celery_status == "STARTED" and job.status == TranscriptionStatus.PENDING:
@@ -123,18 +141,37 @@ def get_job_status(job_id: str):
     return job
 
 
+from fastapi import File, UploadFile
+
 @app.post("/meetings/{meeting_id}/upload")
-def upload_audio_file(meeting_id: int):
-    # Hier würden wir normalerweise die Datei hochladen
-    # Für jetzt aktualisieren wir nur den Pfad
+async def upload_audio_file(meeting_id: int, file: UploadFile = File(...)):
+    # Prüfe, ob das Meeting existiert
     meeting = db.get_meeting(meeting_id)
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting nicht gefunden")
     
-    audio_path = f"uploads/meeting_{meeting_id}.mp3"
+    # Stelle sicher, dass das Upload-Verzeichnis existiert
+    upload_dir = os.path.join("data", "audio")
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # Generiere einen eindeutigen Dateinamen
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"meeting_{meeting_id}_{timestamp}{os.path.splitext(file.filename)[1]}"
+    file_path = os.path.join(upload_dir, filename)
+    relative_path = os.path.join("audio", filename)
+    
+    # Speichere die hochgeladene Datei
+    try:
+        contents = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(contents)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Fehler beim Speichern der Datei: {str(e)}")
+    
+    # Aktualisiere den Dateipfad im Meeting
     updated_meeting = db.update_meeting(
         meeting_id, 
-        MeetingUpdate(audio_file=audio_path)
+        MeetingUpdate(audio_file=relative_path)
     )
     
     return {"message": "Audio-Datei erfolgreich hochgeladen", "meeting": updated_meeting}
