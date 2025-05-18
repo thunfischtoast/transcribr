@@ -1,0 +1,74 @@
+services:
+    # FastAPI application
+    api:
+        build:
+            context: ./backend
+            dockerfile: Dockerfile
+        ports:
+            - "8000:8000"
+        volumes:
+            - ./data:/app/data
+        environment:
+            - REDIS_URL=redis://redis:6379/0
+            - DATABASE_URL=sqlite:///./data/meetings.db
+            - TRANSCRIPTION_SERVICE_URL=http://transcription:9000/asr
+            - UPLOAD_FOLDER=/app/data/uploads
+        depends_on:
+            - redis
+            - transcription
+        restart: unless-stopped
+
+    # Celery worker for async tasks
+    worker:
+        build:
+            context: ./backend
+            dockerfile: Dockerfile
+        command: celery -A task.app worker --loglevel=info --concurrency=1
+        volumes:
+            - ./data:/app/data
+        environment:
+            - REDIS_URL=redis://redis:6379/0
+            - DATABASE_URL=sqlite:///./data/meetings.db
+            - TRANSCRIPTION_SERVICE_URL=http://transcription:9000/asr
+            - UPLOAD_FOLDER=/app/data/uploads
+        depends_on:
+            - redis
+            - transcription
+        restart: unless-stopped
+
+    # Redis for message queue
+    redis:
+        image: redis:7-alpine
+        ports:
+            - "6379:6379"
+        volumes:
+            - redis-data:/data
+        restart: unless-stopped
+
+    # Whisper ASR Webservice
+    transcription:
+        image: onerahmet/openai-whisper-asr-webservice:latest
+        ports:
+            - "9000:9000"
+        volumes:
+            - ./data/uploads:/app/uploads
+            - ./data/models:/root/.cache/
+        environment:
+            - ASR_MODEL=base
+            - ASR_ENGINE=openai_whisper
+            - ENABLE_TRANSLATION=false
+        restart: unless-stopped
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: 1
+                          capabilities: [gpu]
+
+volumes:
+    redis-data:
+
+networks:
+    default:
+        name: transcript-network
