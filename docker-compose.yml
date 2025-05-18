@@ -54,7 +54,7 @@ services:
             - ./data/uploads:/app/uploads
             - ./data/models:/root/.cache/
         environment:
-            - ASR_MODEL=base
+            - ASR_MODEL=small
             - ASR_ENGINE=openai_whisper
             - ENABLE_TRANSLATION=false
         restart: unless-stopped
