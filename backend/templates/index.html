@@ -7,7 +7,7 @@
 
 <div class="box">
     <h2 class="subtitle">Neues Meeting erstellen</h2>
-    <form hx-post="/meetings" hx-target="#meeting-list" hx-swap="afterbegin">
+    <form hx-post="/meetings" hx-target="#meeting-list" hx-swap="afterbegin" hx-select="#meeting-list > *">
         <div class="field">
             <label class="label">Titel</label>
             <div class="control">
