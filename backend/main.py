@@ -86,17 +86,17 @@ def transcribe_meeting(meeting_id: int):
     if not meeting.audio_file:
         raise HTTPException(status_code=400, detail="Keine Audio-Datei für dieses Meeting vorhanden")
     
-    # Starte den Transkriptionstask
-    r = submit_transcription.delay(meeting_id, meeting.audio_file)
-    
-    # Erstelle einen Transkriptionsjob in der Datenbank
-    job = db.create_transcription_job(meeting_id, r.task_id)
-    
     # Aktualisiere den Meeting-Status auf "processing"
     db.update_meeting(
         meeting_id,
         MeetingUpdate(status=TranscriptionStatus.PROCESSING)
     )
+    
+    # Starte den Transkriptionstask
+    r = submit_transcription.delay(meeting_id, meeting.audio_file)
+    
+    # Erstelle einen Transkriptionsjob in der Datenbank
+    job = db.create_transcription_job(meeting_id, r.task_id)
     
     return {"job_id": job.job_id, "status": job.status}
 
@@ -122,14 +122,15 @@ def get_job_status(job_id: str):
         task_result = celery_result.result
         
         # Wenn das Ergebnis ein Transkript enthält, speichern wir es
-        if isinstance(task_result, dict) and task_result.get("status") == "completed":
-            # Prüfen, ob ein Transkript-Datei-Pfad vorhanden ist
-            transcript_file = task_result.get("transcript_file")
-            if transcript_file and os.path.exists(transcript_file):
-                with open(transcript_file, "r", encoding="utf-8") as f:
-                    transcript_text = f.read()
-                # Transkript in der Datenbank speichern
-                db.save_transcript(job.meeting_id, transcript_text)
+        if isinstance(task_result, dict):
+            if task_result.get("status") == "completed":
+                # Prüfen, ob ein Transkript-Datei-Pfad vorhanden ist
+                transcript_file = task_result.get("transcript_file")
+                if transcript_file and os.path.exists(transcript_file):
+                    with open(transcript_file, "r", encoding="utf-8") as f:
+                        transcript_text = f.read()
+                    # Transkript in der Datenbank speichern
+                    db.save_transcript(job.meeting_id, transcript_text)
             
         job = db.update_transcription_job_status(job_id, TranscriptionStatus.COMPLETED)
         

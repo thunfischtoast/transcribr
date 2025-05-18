@@ -88,16 +88,31 @@ def submit_transcription(meeting_id: int, audio_path: str) -> Dict[str, Any]:
             )
         
         if response.status_code == 200:
-            result = response.text
-            job_id = result.get("id", "unknown")
+            # Generiere eine eindeutige Job-ID, da der Service keine zurückgibt
+            import uuid
+            job_id = f"job_{uuid.uuid4()}"
             
-            # Starte einen Task zum Abfragen des Status
-            poll_transcription_status.delay(job_id, meeting_id)
+            # Speichere die Antwort als Transkript
+            transcript_text = response.text
+            
+            # Transkript in Datei speichern
+            transcript_dir = os.path.join(data_dir, "transcripts")
+            os.makedirs(transcript_dir, exist_ok=True)
+            
+            transcript_file = os.path.join(transcript_dir, f"meeting_{meeting_id}_transcript.txt")
+            with open(transcript_file, "w", encoding="utf-8") as f:
+                f.write(transcript_text)
+            
+            logger.info(f"Transcript saved to {transcript_file} for job {job_id}")
+            
+            # Verarbeite das Transkript direkt, da es bereits vollständig ist
+            process_completed_transcript.delay(meeting_id, transcript_text)
             
             return {
                 "job_id": job_id,
-                "status": "submitted",
-                "meeting_id": meeting_id
+                "status": "completed",
+                "meeting_id": meeting_id,
+                "transcript_file": transcript_file
             }
         else:
             error_msg = f"Error submitting transcription: {response.text}"
@@ -115,58 +130,17 @@ def submit_transcription(meeting_id: int, audio_path: str) -> Dict[str, Any]:
 @app.task
 def poll_transcription_status(job_id: str, meeting_id: int, max_retries: int = 60, retry_delay: int = 30):
     """
-    Überprüft den Status einer Transkription beim Whisper-Service.
-    Wird wiederholt aufgerufen, bis die Transkription abgeschlossen ist oder fehlschlägt.
+    Diese Funktion ist jetzt ein Legacy-Stub, da der Transkriptionsservice 
+    direkt das vollständige Transkript zurückgibt und kein Polling mehr erforderlich ist.
     
     Args:
         job_id: ID des Transkriptionsjobs
         meeting_id: ID des zugehörigen Meetings
-        max_retries: Maximale Anzahl von Wiederholungen
-        retry_delay: Verzögerung zwischen den Wiederholungen in Sekunden
+        max_retries: Nicht mehr verwendet
+        retry_delay: Nicht mehr verwendet
     """
-    logger.info(f"Polling transcription status for job {job_id}, meeting {meeting_id}")
-    
-    try:
-        # Status vom Whisper-Service abfragen
-        response = requests.get(f"{whisper_service_url}/asr?id={job_id}")
-        
-        if response.status_code == 200:
-            result = response.json()
-            status = result.get("status")
-            
-            if status == "completed":
-                # Transkription ist fertig, verarbeite das Ergebnis
-                transcript_text = result.get("text", "")
-                process_completed_transcript.delay(meeting_id, transcript_text)
-                return {"status": "completed", "job_id": job_id}
-                
-            elif status == "failed":
-                logger.error(f"Transcription failed for job {job_id}")
-                return {"status": "failed", "job_id": job_id}
-                
-            else:
-                # Noch in Bearbeitung, erneut abfragen nach Verzögerung
-                # Überprüfe, ob maximale Anzahl von Wiederholungen erreicht ist
-                current_retry = poll_transcription_status.request.retries
-                if current_retry < max_retries:
-                    logger.info(f"Job {job_id} still in progress, retrying in {retry_delay} seconds")
-                    raise poll_transcription_status.retry(countdown=retry_delay)
-                else:
-                    logger.error(f"Max retries reached for job {job_id}")
-                    return {"status": "timeout", "job_id": job_id}
-        else:
-            error_msg = f"Error checking transcription status: {response.text}"
-            logger.error(error_msg)
-            return {"error": error_msg, "status": "failed"}
-            
-    except Exception as e:
-        logger.error(f"Exception during status check: {str(e)}")
-        # Bei Netzwerkfehlern erneut versuchen
-        current_retry = poll_transcription_status.request.retries
-        if current_retry < max_retries:
-            raise poll_transcription_status.retry(countdown=retry_delay, exc=e)
-        else:
-            return {"error": str(e), "status": "failed"}
+    logger.info(f"Legacy poll_transcription_status called for job {job_id}, meeting {meeting_id}")
+    return {"status": "completed", "job_id": job_id, "message": "Direct transcription, no polling needed"}
 
 
 @app.task
