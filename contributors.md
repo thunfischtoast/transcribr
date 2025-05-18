@@ -1,94 +1,94 @@
-# Entwicklerübersicht
+# Developer Overview
 
-## Projektstruktur
+## Project Structure
 
-### Hauptkomponenten
-- **Backend (FastAPI)**: Stellt die API-Endpunkte und Weboberfläche bereit
-- **Datenbank (SQLite)**: Speichert Meeting- und Transkriptionsdaten
-- **Transkriptionsservice**: Verarbeitet Audiodateien und erstellt Transkripte
-- **Job-Queue (Celery + Redis)**: Verwaltet asynchrone Verarbeitungsaufgaben
+### Main Components
+- **Backend (FastAPI)**: Provides API endpoints and web interface
+- **Database (SQLite)**: Stores meeting and transcription data
+- **Transcription Service**: Processes audio files and creates transcripts
+- **Job Queue (Celery + Redis)**: Manages asynchronous processing tasks
 
-### Dateien und Verzeichnisse
-- `main.py`: Hauptanwendung mit FastAPI-Routen und Endpunkten
-- `models.py`: Datenmodelle und Schemas
-- `database.py`: Datenbankzugriff und CRUD-Operationen
-- `task.py`: Celery-Tasks für asynchrone Verarbeitung
-- `templates/`: Jinja2-Templates für die Weboberfläche
-- `data/`: Speicherort für Datenbank, Audio- und Transkriptionsdateien
+### Files and Directories
+- `main.py`: Main application with FastAPI routes and endpoints
+- `models.py`: Data models and schemas
+- `database.py`: Database access and CRUD operations
+- `task.py`: Celery tasks for asynchronous processing
+- `templates/`: Jinja2 templates for the web interface
+- `data/`: Storage location for database, audio, and transcription files
 
-## Entwicklungsumgebung einrichten
+## Setting Up Development Environment
 
-### Voraussetzungen
+### Prerequisites
 - Python 3.8+
-- Docker und Docker Compose
+- Docker and Docker Compose
 - Git
 
-### Lokale Entwicklung
-1. Repository klonen
-2. Virtuelle Umgebung erstellen: `python -m venv venv`
-3. Abhängigkeiten installieren: `pip install -r frozen-requirements.txt`
-4. Docker-Container starten: `docker-compose up -d`
-5. Anwendung starten: `cd backend && uvicorn main:app --reload`
+### Local Development
+1. Clone repository
+2. Create virtual environment: `python -m venv venv`
+3. Install dependencies: `pip install -r frozen-requirements.txt`
+4. Start Docker containers: `docker-compose up -d`
+5. Start application: `cd backend && uvicorn main:app --reload`
 
-### Abhängigkeiten
-Die Hauptabhängigkeiten des Projekts sind:
-- FastAPI: Web-Framework für API-Entwicklung
-- Celery: Asynchrone Task-Queue
-- Jinja2: Template-Engine für HTML-Rendering
-- SQLite: Leichtgewichtige Datenbank
-- Requests: HTTP-Client für API-Aufrufe
-- Pydantic: Datenvalidierung und -serialisierung
+### Dependencies
+The main dependencies of the project are:
+- FastAPI: Web framework for API development
+- Celery: Asynchronous task queue
+- Jinja2: Template engine for HTML rendering
+- SQLite: Lightweight database
+- Requests: HTTP client for API calls
+- Pydantic: Data validation and serialization
 
-Eine vollständige Liste der Abhängigkeiten finden Sie in der Datei `frozen-requirements.txt`.
+A complete list of dependencies can be found in the `frozen-requirements.txt` file.
 
-## Beitragsrichtlinien
+## Contribution Guidelines
 
-### Code-Stil
-- PEP 8 für Python-Code
-- Docstrings für alle Funktionen und Klassen
-- Typisierung mit Python-Typhinweisen
+### Code Style
+- PEP 8 for Python code
+- Docstrings for all functions and classes
+- Typing with Python type hints
 
-### Pull-Request-Prozess
-1. Feature-Branch erstellen: `git checkout -b feature/name`
-2. Änderungen implementieren und testen
-3. Pull-Request mit detaillierter Beschreibung erstellen
-4. Code-Review abwarten und Feedback einarbeiten
+### Pull Request Process
+1. Create feature branch: `git checkout -b feature/name`
+2. Implement and test changes
+3. Create pull request with detailed description
+4. Wait for code review and incorporate feedback
 
 ### Tests
-- Automatisierte Tests für neue Funktionen schreiben
-- Bestehende Tests vor dem Einreichen von PRs ausführen
+- Write automated tests for new features
+- Run existing tests before submitting PRs
 
-## Architektur
+## Architecture
 
-### Datenfluss
-1. Benutzer erstellt Meeting und lädt Audiodatei hoch
-2. Transkriptionsauftrag wird in die Warteschlange gestellt
-3. Celery-Worker verarbeitet den Auftrag und sendet die Audiodatei an den Transkriptionsservice
-4. Transkriptionsergebnis wird in der Datenbank gespeichert
-5. Benutzer kann das Transkript im Meeting-Detail einsehen
+### Data Flow
+1. User creates meeting and uploads audio file
+2. Transcription job is queued
+3. Celery worker processes the job and sends the audio file to the transcription service
+4. Transcription result is stored in the database
+5. User can view the transcript in the meeting detail
 
-### API-Endpunkte
-Siehe `endpoints.md` für eine vollständige Liste der verfügbaren API-Endpunkte.
+### API Endpoints
+See `endpoints.md` for a complete list of available API endpoints.
 
 ## Deployment
 
-### Docker-Compose
-Die Anwendung ist für die Bereitstellung mit Docker Compose konfiguriert:
+### Docker Compose
+The application is configured for deployment with Docker Compose:
 ```bash
 docker-compose up -d
 ```
 
-### Umgebungsvariablen
-- `REDIS_URL`: URL für Redis-Verbindung
-- `TRANSCRIPTION_SERVICE_URL`: URL des Transkriptionsdienstes
-- `DATA_DIR`: Verzeichnis für Datenspeicherung
+### Environment Variables
+- `REDIS_URL`: URL for Redis connection
+- `TRANSCRIPTION_SERVICE_URL`: URL of the transcription service
+- `DATA_DIR`: Directory for data storage
 
-## Fehlerbehebung
+## Troubleshooting
 
-### Häufige Probleme
-- **Redis-Verbindungsfehler**: Prüfen Sie, ob der Redis-Container läuft
-- **Transkriptionsfehler**: Überprüfen Sie die Logs des Transkriptionsdienstes
-- **Datenbankfehler**: Stellen Sie sicher, dass das Datenverzeichnis beschreibbar ist
+### Common Issues
+- **Redis connection errors**: Check if the Redis container is running
+- **Transcription errors**: Check the logs of the transcription service
+- **Database errors**: Ensure the data directory is writable
 
 ### Logging
-Die Anwendung verwendet das Python-Logging-Modul. Logs werden in der Konsole ausgegeben und können für die Fehlerbehebung verwendet werden.
+The application uses the Python logging module. Logs are output to the console and can be used for troubleshooting.
