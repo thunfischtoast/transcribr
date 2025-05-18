@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any
 
 # Konfiguration
 redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-whisper_service_url = os.getenv("WHISPER_SERVICE_URL", "http://whisper:9000")
+whisper_service_url = os.getenv("TRANSCRIPTION_SERVICE_URL", "http://transcription:9000")
 data_dir = os.getenv("DATA_DIR", "/app/data")
 audio_dir = os.path.join(data_dir, "audio")
 celery_dir = os.path.join(data_dir, "celery")
